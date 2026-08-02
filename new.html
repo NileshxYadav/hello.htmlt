@@ -1,0 +1,1671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>NEON PONG</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/press-start-2p@latest/latin-400-normal.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-400-normal.css" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; user-select: none; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: #05060a;
+    font-family: 'Inter', sans-serif;
+    color: #e6f1ff;
+  }
+  #app {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background:
+      radial-gradient(ellipse at top, rgba(0, 229, 255, 0.08), transparent 60%),
+      radial-gradient(ellipse at bottom, rgba(255, 0, 170, 0.08), transparent 60%),
+      #05060a;
+    transition: background 0.4s ease;
+  }
+  #wrap {
+    position: relative;
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  canvas {
+    display: block;
+    background: #070912;
+    border-radius: 14px;
+    box-shadow:
+      0 0 0 1px rgba(0, 229, 255, 0.25),
+      0 0 40px rgba(0, 229, 255, 0.15),
+      0 0 80px rgba(255, 0, 170, 0.08);
+    max-width: 100%; max-height: 100%;
+    transition: box-shadow 0.4s ease;
+    touch-action: none;
+    z-index: 1;
+  }
+
+  /* HUD */
+  .hud {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .hud-scores {
+    display: flex; gap: 14px; align-items: center;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+  }
+  .hud .score {
+    padding: 6px 12px;
+    background: rgba(10, 14, 28, 0.7);
+    border: 1px solid rgba(0, 229, 255, 0.3);
+    border-radius: 8px;
+    letter-spacing: 2px;
+    transition: color 0.3s, border-color 0.3s, text-shadow 0.3s;
+  }
+  .hud .score.left { color: #00e5ff; text-shadow: 0 0 10px rgba(0, 229, 255, 0.6); }
+  .hud .score.right { color: #ff00aa; text-shadow: 0 0 10px rgba(255, 0, 170, 0.6); }
+  .hud .vs { color: #8892b0; font-size: 9px; }
+
+  .speed-display {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 10px;
+    background: rgba(10, 14, 28, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    color: #8892b0;
+    letter-spacing: 1px;
+  }
+  .speed-display .speed-label {
+    color: #8892b0;
+  }
+  .speed-bar {
+    width: 80px; height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+  }
+  .speed-fill {
+    height: 100%;
+    width: 50%;
+    background: linear-gradient(90deg, #00e5ff, #ff00aa);
+    border-radius: 3px;
+    transition: width 0.1s ease;
+    box-shadow: 0 0 6px rgba(0, 229, 255, 0.6);
+  }
+  .speed-value {
+    color: #00e5ff;
+    min-width: 28px;
+    text-align: right;
+    text-shadow: 0 0 6px rgba(0, 229, 255, 0.5);
+  }
+
+  /* Best Score HUD */
+  .best-score-hud {
+    display: flex; align-items: center; gap: 6px;
+    padding: 3px 8px;
+    background: rgba(10, 14, 28, 0.6);
+    border: 1px solid rgba(255, 215, 0, 0.25);
+    border-radius: 5px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    color: #ffd700;
+    letter-spacing: 1px;
+    text-shadow: 0 0 6px rgba(255, 215, 0, 0.4);
+  }
+  .best-score-hud .trophy { font-size: 10px; }
+
+  /* Overlay */
+  .overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at center, rgba(5,6,10,0.85), rgba(5,6,10,0.98));
+    backdrop-filter: blur(6px);
+    z-index: 100;
+    padding: 20px;
+    text-align: center;
+    overflow-y: auto;
+    touch-action: manipulation;
+  }
+  .overlay.hidden { display: none; }
+  .title {
+    font-family: 'Press Start 2P', monospace;
+    font-size: clamp(22px, 6vw, 44px);
+    letter-spacing: 4px;
+    background: linear-gradient(90deg, #00e5ff, #ff00aa);
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+    text-shadow: 0 0 30px rgba(0, 229, 255, 0.3);
+    margin-bottom: 8px;
+  }
+  .subtitle {
+    font-size: clamp(10px, 2.5vw, 13px);
+    color: #8892b0;
+    margin-bottom: 28px;
+    letter-spacing: 1px;
+  }
+  .btn-group {
+    display: flex; flex-direction: column; gap: 12px;
+    width: min(360px, 92vw);
+  }
+  .btn {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 12px;
+    padding: 14px 18px;
+    background: linear-gradient(135deg, rgba(0, 229, 255, 0.08), rgba(255, 0, 170, 0.08));
+    border: 1px solid rgba(0, 229, 255, 0.4);
+    color: #e6f1ff;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .btn:hover, .btn:active {
+    background: linear-gradient(135deg, rgba(0, 229, 255, 0.2), rgba(255, 0, 170, 0.2));
+    border-color: #00e5ff;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 229, 255, 0.25);
+  }
+  .btn.primary {
+    background: linear-gradient(135deg, #00e5ff, #ff00aa);
+    color: #05060a;
+    border: none;
+    font-weight: bold;
+  }
+  .btn.primary:hover { box-shadow: 0 6px 25px rgba(255, 0, 170, 0.4); }
+
+  .row { display: flex; gap: 10px; width: min(360px, 92vw); }
+  .row .btn { flex: 1; font-size: 10px; padding: 10px 8px; }
+  .row .btn.active {
+    background: linear-gradient(135deg, rgba(0, 229, 255, 0.3), rgba(255, 0, 170, 0.3));
+    border-color: #ff00aa;
+    color: #fff;
+  }
+
+  .label {
+    font-size: 10px; color: #8892b0;
+    margin-bottom: 8px; letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
+
+  .controls-hint {
+    position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+    font-size: 10px; color: #4a5578;
+    letter-spacing: 1px;
+    z-index: 5;
+    pointer-events: none;
+    text-align: center;
+    width: 90%;
+  }
+
+  .icon-btn {
+    position: absolute; top: 14px; right: 14px;
+    width: 40px; height: 40px;
+    background: rgba(10, 14, 28, 0.7);
+    border: 1px solid rgba(0, 229, 255, 0.3);
+    border-radius: 8px;
+    color: #00e5ff;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    z-index: 10;
+    transition: all 0.2s;
+    touch-action: manipulation;
+  }
+  .icon-btn:hover { border-color: #00e5ff; box-shadow: 0 0 15px rgba(0, 229, 255, 0.4); }
+
+  .winner {
+    font-family: 'Press Start 2P', monospace;
+    font-size: clamp(16px, 4vw, 28px);
+    margin: 10px 0 20px;
+    letter-spacing: 2px;
+  }
+  .winner.cyan { color: #00e5ff; text-shadow: 0 0 20px rgba(0, 229, 255, 0.6); }
+  .winner.pink { color: #ff00aa; text-shadow: 0 0 20px rgba(255, 0, 170, 0.6); }
+
+  .final-score {
+    font-family: 'Press Start 2P', monospace;
+    font-size: clamp(24px, 6vw, 42px);
+    margin-bottom: 24px;
+    letter-spacing: 4px;
+  }
+
+  /* Best Score Display */
+  .best-score-display {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 8px 16px;
+    background: rgba(255, 215, 0, 0.06);
+    border: 1px solid rgba(255, 215, 0, 0.25);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    color: #ffd700;
+    letter-spacing: 1px;
+    text-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+  }
+  .best-score-display .trophy { font-size: 14px; }
+  .best-score-display .best-val {
+    color: #fff;
+    font-size: 11px;
+    text-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
+  }
+
+  .new-best {
+    animation: newBestPulse 0.6s ease infinite alternate;
+  }
+  @keyframes newBestPulse {
+    from { transform: scale(1); }
+    to { transform: scale(1.05); text-shadow: 0 0 20px rgba(255, 215, 0, 0.8); }
+  }
+
+  /* Settings Panel */
+  .settings-panel {
+    width: min(440px, 94vw);
+    display: flex; flex-direction: column; gap: 18px;
+    margin-top: 10px;
+  }
+  .setting-group {
+    background: rgba(10, 14, 28, 0.5);
+    border: 1px solid rgba(0, 229, 255, 0.2);
+    border-radius: 12px;
+    padding: 14px 16px;
+    text-align: left;
+  }
+  .setting-group .setting-title {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+    color: #00e5ff;
+    letter-spacing: 1.5px;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .setting-group .setting-title .value-badge {
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    color: #ff00aa;
+    background: rgba(255, 0, 170, 0.12);
+    border: 1px solid rgba(255, 0, 170, 0.3);
+    padding: 3px 8px;
+    border-radius: 6px;
+    letter-spacing: 1px;
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    background: linear-gradient(90deg, rgba(0, 229, 255, 0.3), rgba(255, 0, 170, 0.3));
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px; height: 20px;
+    background: linear-gradient(135deg, #00e5ff, #ff00aa);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 12px rgba(0, 229, 255, 0.6), 0 0 20px rgba(255, 0, 170, 0.3);
+    border: 2px solid rgba(255, 255, 255, 0.9);
+    transition: transform 0.15s;
+  }
+  input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.15); }
+  input[type="range"]::-moz-range-thumb {
+    width: 20px; height: 20px;
+    background: linear-gradient(135deg, #00e5ff, #ff00aa);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 12px rgba(0, 229, 255, 0.6);
+    border: 2px solid rgba(255, 255, 255, 0.9);
+  }
+
+  /* Theme Grid */
+  .theme-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  .theme-option {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+  }
+  .theme-option:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.4);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  }
+  .theme-option.active {
+    border-color: #fff;
+    box-shadow: 0 0 20px var(--theme-glow, rgba(255, 255, 255, 0.5));
+  }
+  .theme-preview {
+    position: absolute; inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px;
+  }
+  .theme-preview .paddle-l, .theme-preview .paddle-r {
+    width: 4px; height: 60%;
+    border-radius: 2px;
+    box-shadow: 0 0 8px currentColor;
+  }
+  .theme-preview .ball-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 10px #fff;
+  }
+  .theme-option .theme-label {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.85), transparent);
+    color: #fff;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    padding: 6px 4px 4px;
+    letter-spacing: 0.5px;
+    text-align: center;
+  }
+  .theme-option .check-mark {
+    position: absolute;
+    top: 4px; right: 4px;
+    width: 18px; height: 18px;
+    background: #fff;
+    color: #000;
+    border-radius: 50%;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: bold;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+  }
+  .theme-option.active .check-mark { display: flex; }
+
+  .settings-footer {
+    display: flex; gap: 10px; width: min(440px, 94vw);
+    margin-top: 6px;
+  }
+  .settings-footer .btn { flex: 1; }
+
+  .scroll-area {
+    width: 100%;
+    max-height: 100%;
+    overflow-y: auto;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 10px 0;
+    touch-action: manipulation;
+  }
+  .scroll-area::-webkit-scrollbar { width: 6px; }
+  .scroll-area::-webkit-scrollbar-track { background: transparent; }
+  .scroll-area::-webkit-scrollbar-thumb {
+    background: rgba(0, 229, 255, 0.3);
+    border-radius: 3px;
+  }
+
+  /* Sound Toggle */
+  .sound-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+  }
+  .toggle-switch {
+    position: relative;
+    width: 52px;
+    height: 28px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 14px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    flex-shrink: 0;
+    touch-action: manipulation;
+  }
+  .toggle-switch.active {
+    background: linear-gradient(135deg, rgba(0, 229, 255, 0.4), rgba(255, 0, 170, 0.4));
+    border-color: rgba(0, 229, 255, 0.6);
+  }
+  .toggle-switch::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.3s ease;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
+  }
+  .toggle-switch.active::after {
+    transform: translateX(24px);
+    background: linear-gradient(135deg, #00e5ff, #ff00aa);
+    box-shadow: 0 0 12px rgba(0, 229, 255, 0.6);
+  }
+
+  /* Paddle Speed Indicator */
+  .paddle-speed-indicator {
+    position: absolute;
+    pointer-events: none;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    padding: 3px 6px;
+    border-radius: 4px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 4;
+    white-space: nowrap;
+  }
+  .paddle-speed-indicator.visible {
+    opacity: 1;
+  }
+  .paddle-speed-indicator.left-ind {
+    background: rgba(0, 229, 255, 0.15);
+    border: 1px solid rgba(0, 229, 255, 0.4);
+    color: #00e5ff;
+    text-shadow: 0 0 6px rgba(0, 229, 255, 0.5);
+  }
+  .paddle-speed-indicator.right-ind {
+    background: rgba(255, 0, 170, 0.15);
+    border: 1px solid rgba(255, 0, 170, 0.4);
+    color: #ff00aa;
+    text-shadow: 0 0 6px rgba(255, 0, 170, 0.5);
+  }
+
+  @media (max-width: 600px) {
+    .hud { top: 8px; gap: 6px; }
+    .hud-scores { gap: 8px; }
+    .hud .score { font-size: 9px; padding: 5px 9px; }
+    .speed-display { font-size: 7px; padding: 3px 7px; }
+    .speed-bar { width: 60px; height: 5px; }
+    .icon-btn { top: 8px; right: 8px; width: 36px; height: 36px; }
+    .theme-grid { grid-template-columns: repeat(2, 1fr); }
+    .setting-group { padding: 12px 14px; }
+    .best-score-display { font-size: 8px; padding: 6px 12px; }
+    .paddle-speed-indicator { font-size: 7px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="wrap">
+    <canvas id="game"></canvas>
+
+    <div class="hud" id="hud" style="display:none;">
+      <div class="hud-scores">
+        <div class="score left" id="scoreLeft">0</div>
+        <div class="vs">VS</div>
+        <div class="score right" id="scoreRight">0</div>
+      </div>
+      <div class="speed-display">
+        <span class="speed-label">SPD</span>
+        <div class="speed-bar"><div class="speed-fill" id="speedFill"></div></div>
+        <span class="speed-value" id="speedValue">5.0</span>
+      </div>
+      <div class="best-score-hud" id="bestScoreHud">
+        <span class="trophy">🏆</span>
+        <span>BEST:</span>
+        <span class="best-val" id="bestScoreHudVal">0</span>
+      </div>
+    </div>
+
+    <!-- Paddle Speed Indicators -->
+    <div class="paddle-speed-indicator left-ind" id="leftSpeedInd">SPD: 5.0</div>
+    <div class="paddle-speed-indicator right-ind" id="rightSpeedInd">SPD: 5.0</div>
+
+    <button class="icon-btn" id="pauseBtn" style="display:none;" title="Pause">⏸</button>
+
+    <!-- Main Menu -->
+    <div class="overlay" id="menu">
+      <div class="title">NEON PONG</div>
+      <div class="subtitle">Classic arcade • Reimagined</div>
+
+      <div class="best-score-display" id="bestScoreMenu">
+        <span class="trophy">🏆</span>
+        <span>BEST SCORE:</span>
+        <span class="best-val" id="bestScoreMenuVal">0</span>
+      </div>
+
+      <div class="label">Game Mode</div>
+      <div class="row" id="modeRow">
+        <button class="btn active" data-mode="ai">🤖 vs AI</button>
+        <button class="btn" data-mode="2p">👥 2 Players</button>
+      </div>
+
+      <div class="label" id="diffLabel">AI Difficulty</div>
+      <div class="row" id="diffRow">
+        <button class="btn" data-diff="easy">Easy</button>
+        <button class="btn active" data-diff="medium">Medium</button>
+        <button class="btn" data-diff="hard">Hard</button>
+      </div>
+
+      <div class="label">Win Score</div>
+      <div class="row" id="winRow">
+        <button class="btn" data-win="5">5</button>
+        <button class="btn active" data-win="7">7</button>
+        <button class="btn" data-win="11">11</button>
+      </div>
+
+      <div class="btn-group" style="margin-top: 20px;">
+        <button class="btn primary" id="startBtn">▶ Start Game</button>
+        <button class="btn" id="settingsBtn">⚙ Settings</button>
+      </div>
+      <div class="controls-hint">
+        <span id="hintText">PC: W/S & ↑/&nbsp;↓ &nbsp;•&nbsp; Mobile: Tap left/right side</span>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div class="overlay hidden" id="settingsMenu">
+      <div class="scroll-area">
+        <div class="title" style="font-size: clamp(18px, 5vw, 32px);">SETTINGS</div>
+        <div class="subtitle">Customize your game</div>
+
+        <div class="settings-panel">
+          <!-- Sound Toggle -->
+          <div class="setting-group">
+            <div class="setting-title">
+              <span>🔊 Sound Effects</span>
+              <span class="value-badge" id="soundValue">ON</span>
+            </div>
+            <div class="sound-toggle">
+              <span style="font-size: 10px; color: #8892b0;">Hit sounds & feedback</span>
+              <div class="toggle-switch active" id="soundToggle"></div>
+            </div>
+          </div>
+
+          <!-- Paddle Size -->
+          <div class="setting-group">
+            <div class="setting-title">
+              <span>🏓 Paddle Size</span>
+              <span class="value-badge" id="paddleSizeValue">Medium</span>
+            </div>
+            <input type="range" id="paddleSizeSlider" min="1" max="5" step="1" value="3" />
+          </div>
+
+          <!-- Ball Speed -->
+          <div class="setting-group">
+            <div class="setting-title">
+              <span>⚡ Ball Speed</span>
+              <span class="value-badge" id="ballSpeedValue">Medium</span>
+            </div>
+            <input type="range" id="ballSpeedSlider" min="1" max="5" step="1" value="3" />
+          </div>
+
+          <!-- Ball Size -->
+          <div class="setting-group">
+            <div class="setting-title">
+              <span>🔵 Ball Size</span>
+              <span class="value-badge" id="ballSizeValue">Medium</span>
+            </div>
+            <input type="range" id="ballSizeSlider" min="1" max="5" step="1" value="3" />
+          </div>
+
+          <!-- Theme -->
+          <div class="setting-group">
+            <div class="setting-title">
+              <span>🎨 Theme</span>
+              <span class="value-badge" id="themeValue">Neon</span>
+            </div>
+            <div class="theme-grid" id="themeGrid"></div>
+          </div>
+        </div>
+
+        <div class="settings-footer">
+          <button class="btn" id="resetSettingsBtn">↻ Reset</button>
+          <button class="btn primary" id="backSettingsBtn">✓ Done</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pause -->
+    <div class="overlay hidden" id="pauseMenu">
+      <div class="title" style="font-size: clamp(18px, 5vw, 32px);">PAUSED</div>
+      <div class="subtitle">Take a breather</div>
+      <div class="btn-group">
+        <button class="btn primary" id="resumeBtn">▶ Resume</button>
+        <button class="btn" id="restartBtn">↻ Restart</button>
+        <button class="btn" id="quitBtn">✕ Main Menu</button>
+      </div>
+    </div>
+
+    <!-- Game Over -->
+    <div class="overlay hidden" id="gameOver">
+      <div class="subtitle">GAME OVER</div>
+      <div class="winner" id="winnerText">PLAYER 1 WINS</div>
+      <div class="final-score" id="finalScore">7 — 3</div>
+      <div class="best-score-display" id="bestScoreGameOver" style="display:none;">
+        <span class="trophy">🏆</span>
+        <span>NEW BEST SCORE!</span>
+        <span class="best-val" id="bestScoreGameOverVal">0</span>
+      </div>
+      <div class="btn-group">
+        <button class="btn primary" id="playAgainBtn">↻ Play Again</button>
+        <button class="btn" id="menuBtn">✕ Main Menu</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const wrap = document.getElementById('wrap');
+
+  const GAME_W = 800;
+  const GAME_H = 500;
+
+  const STATE = { MENU: 0, PLAYING: 1, PAUSED: 2, OVER: 3 };
+  let state = STATE.MENU;
+
+  let mode = 'ai';
+  let difficulty = 'medium';
+  let winScore = 7;
+
+  // Sound System
+  let audioCtx = null;
+  let soundEnabled = true;
+
+  function initAudio() {
+    if (!audioCtx) {
+      try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      } catch(e) {
+        console.log('Audio not supported');
+      }
+    }
+  }
+
+  function playSound(type) {
+    if (!soundEnabled || !audioCtx) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    const now = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    switch(type) {
+      case 'paddle':
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.05);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+        osc.start(now);
+        osc.stop(now + 0.12);
+        break;
+      case 'wall':
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(300, now);
+        osc.frequency.exponentialRampToValueAtTime(200, now + 0.08);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+        osc.start(now);
+        osc.stop(now + 0.08);
+        break;
+      case 'score':
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(200, now);
+        osc.frequency.exponentialRampToValueAtTime(80, now + 0.3);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+        osc.start(now);
+        osc.stop(now + 0.3);
+        break;
+      case 'win':
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(523, now);
+        osc.frequency.setValueAtTime(659, now + 0.15);
+        osc.frequency.setValueAtTime(784, now + 0.3);
+        osc.frequency.setValueAtTime(1047, now + 0.45);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.setValueAtTime(0.12, now + 0.5);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+        osc.start(now);
+        osc.stop(now + 0.7);
+        break;
+      case 'lose':
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(400, now);
+        osc.frequency.exponentialRampToValueAtTime(100, now + 0.5);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+        osc.start(now);
+        osc.stop(now + 0.5);
+        break;
+    }
+  }
+
+  // Best Score System
+  let bestScore = parseInt(localStorage.getItem('neonPongBestScore') || '0', 10);
+
+  function saveBestScore(score) {
+    if (score > bestScore) {
+      bestScore = score;
+      localStorage.setItem('neonPongBestScore', bestScore.toString());
+      return true;
+    }
+    return false;
+  }
+
+  function updateBestScoreDisplays() {
+    document.getElementById('bestScoreMenuVal').textContent = bestScore;
+    document.getElementById('bestScoreHudVal').textContent = bestScore;
+  }
+
+  // Themes
+  const themes = {
+    neon: {
+      name: 'Neon',
+      bg: '#070912',
+      left: '#00e5ff', right: '#ff00aa',
+      grid: 'rgba(0, 229, 255, 0.05)',
+      line: 'rgba(136, 146, 176, 0.35)',
+      circle: 'rgba(136, 146, 176, 0.2)',
+      glow: 'rgba(0, 229, 255, 0.25)',
+      accent1: 'rgba(0, 229, 255, 0.08)',
+      accent2: 'rgba(255, 0, 170, 0.08)',
+      previewBg: 'linear-gradient(135deg, #070912, #0a0e1c)'
+    },
+    retro: {
+      name: 'Retro',
+      bg: '#1a0f05',
+      left: '#ffb347', right: '#ff6b35',
+      grid: 'rgba(255, 179, 71, 0.08)',
+      line: 'rgba(255, 200, 120, 0.35)',
+      circle: 'rgba(255, 200, 120, 0.2)',
+      glow: 'rgba(255, 179, 71, 0.3)',
+      accent1: 'rgba(255, 179, 71, 0.1)',
+      accent2: 'rgba(255, 107, 53, 0.1)',
+      previewBg: 'linear-gradient(135deg, #1a0f05, #2d1810)'
+    },
+    matrix: {
+      name: 'Matrix',
+      bg: '#020a02',
+      left: '#00ff41', right: '#39ff14',
+      grid: 'rgba(0, 255, 65, 0.06)',
+      line: 'rgba(0, 255, 65, 0.3)',
+      circle: 'rgba(0, 255, 65, 0.18)',
+      glow: 'rgba(0, 255, 65, 0.3)',
+      accent1: 'rgba(0, 255, 65, 0.08)',
+      accent2: 'rgba(57, 255, 20, 0.08)',
+      previewBg: 'linear-gradient(135deg, #020a02, #051505)'
+    },
+    ice: {
+      name: 'Ice',
+      bg: '#050a14',
+      left: '#a8e6ff', right: '#4fc3f7',
+      grid: 'rgba(168, 230, 255, 0.06)',
+      line: 'rgba(168, 230, 255, 0.3)',
+      circle: 'rgba(168, 230, 255, 0.18)',
+      glow: 'rgba(168, 230, 255, 0.3)',
+      accent1: 'rgba(168, 230, 255, 0.08)',
+      accent2: 'rgba(79, 195, 247, 0.08)',
+      previewBg: 'linear-gradient(135deg, #050a14, #0a1a2e)'
+    },
+    fire: {
+      name: 'Fire',
+      bg: '#140505',
+      left: '#ff4444', right: '#ffaa00',
+      grid: 'rgba(255, 68, 68, 0.06)',
+      line: 'rgba(255, 170, 0, 0.3)',
+      circle: 'rgba(255, 100, 0, 0.18)',
+      glow: 'rgba(255, 68, 68, 0.3)',
+      accent1: 'rgba(255, 68, 68, 0.08)',
+      accent2: 'rgba(255, 170, 0, 0.08)',
+      previewBg: 'linear-gradient(135deg, #140505, #2d0a0a)'
+    },
+    vapor: {
+      name: 'Vapor',
+      bg: '#0d0514',
+      left: '#ff71ce', right: '#b967ff',
+      grid: 'rgba(255, 113, 206, 0.06)',
+      line: 'rgba(185, 103, 255, 0.3)',
+      circle: 'rgba(185, 103, 255, 0.18)',
+      glow: 'rgba(255, 113, 206, 0.3)',
+      accent1: 'rgba(255, 113, 206, 0.08)',
+      accent2: 'rgba(185, 103, 255, 0.08)',
+      previewBg: 'linear-gradient(135deg, #0d0514, #1a0a2e)'
+    }
+  };
+
+  const settings = {
+    paddleSize: 3,
+    ballSpeed: 3,
+    ballSize: 3,
+    theme: 'neon'
+  };
+
+  function getPaddleH() {
+    const map = { 1: 55, 2: 72, 3: 90, 4: 115, 5: 145 };
+    return map[settings.paddleSize] || 90;
+  }
+  function getBallSpeed() {
+    const map = { 1: 3, 2: 4, 3: 5, 4: 6.5, 5: 8.5 };
+    return map[settings.ballSpeed] || 5;
+  }
+  function getBallR() {
+    const map = { 1: 5, 2: 6.5, 3: 8, 4: 10, 5: 13 };
+    return map[settings.ballSize] || 8;
+  }
+  function getPaddleLabel(v) {
+    return ['Tiny', 'Small', 'Medium', 'Large', 'Huge'][v - 1] || 'Medium';
+  }
+  function getSpeedLabel(v) {
+    return ['Slow', 'Gentle', 'Medium', 'Fast', 'Blazing'][v - 1] || 'Medium';
+  }
+  function getSizeLabel(v) {
+    return ['Tiny', 'Small', 'Medium', 'Large', 'Huge'][v - 1] || 'Medium';
+  }
+
+  function getTheme() { return themes[settings.theme] || themes.neon; }
+
+  const PADDLE_W = 12;
+  const PADDLE_SPEED = 7;
+
+  let left, right, ball;
+  let scoreLeft = 0, scoreRight = 0;
+  let lastTime = 0;
+  let particles = [];
+  let trail = [];
+
+  // Paddle speed indicator state
+  let leftSpeedPopup = { visible: false, speed: 0, timer: 0 };
+  let rightSpeedPopup = { visible: false, speed: 0, timer: 0 };
+
+  const keys = {};
+  const touch = { left: null, right: null };
+
+  // Build theme grid
+  function buildThemeGrid() {
+    const grid = document.getElementById('themeGrid');
+    grid.innerHTML = '';
+    Object.entries(themes).forEach(([id, t]) => {
+      const opt = document.createElement('div');
+      opt.className = 'theme-option' + (settings.theme === id ? ' active' : '');
+      opt.style.background = t.previewBg;
+      opt.style.setProperty('--theme-glow', t.glow);
+      opt.dataset.theme = id;
+
+      const preview = document.createElement('div');
+      preview.className = 'theme-preview';
+
+      const paddleL = document.createElement('div');
+      paddleL.className = 'paddle-l';
+      paddleL.style.background = t.left;
+      paddleL.style.color = t.left;
+
+      const ballDot = document.createElement('div');
+      ballDot.className = 'ball-dot';
+
+      const paddleR = document.createElement('div');
+      paddleR.className = 'paddle-r';
+      paddleR.style.background = t.right;
+      paddleR.style.color = t.right;
+
+      preview.appendChild(paddleL);
+      preview.appendChild(ballDot);
+      preview.appendChild(paddleR);
+      opt.appendChild(preview);
+
+      const label = document.createElement('div');
+      label.className = 'theme-label';
+      label.textContent = t.name;
+      opt.appendChild(label);
+
+      const check = document.createElement('div');
+      check.className = 'check-mark';
+      check.textContent = '✓';
+      opt.appendChild(check);
+
+      opt.addEventListener('click', (e) => {
+        e.stopPropagation();
+        settings.theme = id;
+        applyTheme();
+        document.querySelectorAll('.theme-option').forEach(o => o.classList.remove('active'));
+        opt.classList.add('active');
+        document.getElementById('themeValue').textContent = t.name;
+      });
+
+      grid.appendChild(opt);
+    });
+  }
+
+  // Apply theme to HUD and app background
+  function applyTheme() {
+    const t = getTheme();
+    const scoreLeftEl = document.getElementById('scoreLeft');
+    const scoreRightEl = document.getElementById('scoreRight');
+    scoreLeftEl.style.color = t.left;
+    scoreLeftEl.style.textShadow = `0 0 10px ${t.left}`;
+    scoreLeftEl.style.borderColor = t.left.replace(')', ', 0.3)').replace('rgb', 'rgba');
+    scoreRightEl.style.color = t.right;
+    scoreRightEl.style.textShadow = `0 0 10px ${t.right}`;
+
+    const speedValue = document.getElementById('speedValue');
+    const speedFill = document.getElementById('speedFill');
+    speedValue.style.color = t.left;
+    speedValue.style.textShadow = `0 0 6px ${t.left}`;
+    speedFill.style.background = `linear-gradient(90deg, ${t.left}, ${t.right})`;
+    speedFill.style.boxShadow = `0 0 6px ${t.left}`;
+
+    // Update app background gradient
+    const app = document.getElementById('app');
+    app.style.background = `
+      radial-gradient(ellipse at top, ${t.accent1}, transparent 60%),
+      radial-gradient(ellipse at bottom, ${t.accent2}, transparent 60%),
+      #05060a
+    `;
+
+    // Update canvas shadow
+    canvas.style.boxShadow = `
+      0 0 0 1px ${t.glow},
+      0 0 40px ${t.accent1},
+      0 0 80px ${t.accent2}
+    `;
+  }
+
+  // ---------------- Setup ----------------
+  function resize() {
+    const rect = wrap.getBoundingClientRect();
+    const padding = window.innerWidth < 600 ? 8 : 24;
+    const availW = rect.width - padding * 2;
+    const availH = rect.height - padding * 2;
+    const ratio = GAME_W / GAME_H;
+    let w = availW, h = availW / ratio;
+    if (h > availH) { h = availH; w = h * ratio; }
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = GAME_W * dpr;
+    canvas.height = GAME_H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resize);
+
+  function resetBall(direction) {
+    const bs = getBallSpeed();
+    const br = getBallR();
+    ball = {
+      x: GAME_W / 2,
+      y: GAME_H / 2,
+      vx: bs * (direction || (Math.random() < 0.5 ? -1 : 1)),
+      vy: bs * (Math.random() * 2 - 1) * 0.6,
+      r: br,
+      speed: bs
+    };
+    trail = [];
+  }
+
+  function resetGame() {
+    const ph = getPaddleH();
+    const t = getTheme();
+    left = { x: 20, y: GAME_H / 2 - ph / 2, w: PADDLE_W, h: ph, vy: 0, color: t.left };
+    right = { x: GAME_W - 20 - PADDLE_W, y: GAME_H / 2 - ph / 2, w: PADDLE_W, h: ph, vy: 0, color: t.right };
+    scoreLeft = 0; scoreRight = 0;
+    particles = [];
+    leftSpeedPopup = { visible: false, speed: 0, timer: 0 };
+    rightSpeedPopup = { visible: false, speed: 0, timer: 0 };
+    resetBall();
+    updateHUD();
+    updateBestScoreDisplays();
+  }
+
+  function updateHUD() {
+    document.getElementById('scoreLeft').textContent = scoreLeft;
+    document.getElementById('scoreRight').textContent = scoreRight;
+  }
+
+  function updateSpeedHUD() {
+    if (!ball) return;
+    const currentSpeed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+    const baseSpeed = getBallSpeed();
+    const maxSpeed = baseSpeed * 2.2;
+    const pct = Math.min(100, Math.max(0, ((currentSpeed - baseSpeed * 0.5) / (maxSpeed - baseSpeed * 0.5)) * 100));
+    document.getElementById('speedFill').style.width = pct + '%';
+    document.getElementById('speedValue').textContent = currentSpeed.toFixed(1);
+  }
+
+  // Update paddle speed indicators position
+  function updatePaddleSpeedIndicators() {
+    const canvasRect = canvas.getBoundingClientRect();
+    const scaleX = canvasRect.width / GAME_W;
+    const scaleY = canvasRect.height / GAME_H;
+
+    const leftInd = document.getElementById('leftSpeedInd');
+    const rightInd = document.getElementById('rightSpeedInd');
+
+    if (leftSpeedPopup.visible && leftSpeedPopup.timer > 0) {
+      leftInd.classList.add('visible');
+      const lx = canvasRect.left + (left.x + left.w + 10) * scaleX;
+      const ly = canvasRect.top + (left.y + left.h / 2 - 10) * scaleY;
+      leftInd.style.left = lx + 'px';
+      leftInd.style.top = ly + 'px';
+      leftInd.textContent = 'SPD: ' + leftSpeedPopup.speed.toFixed(1);
+    } else {
+      leftInd.classList.remove('visible');
+    }
+
+    if (rightSpeedPopup.visible && rightSpeedPopup.timer > 0) {
+      rightInd.classList.add('visible');
+      const rx = canvasRect.left + (right.x - 60) * scaleX;
+      const ry = canvasRect.top + (right.y + right.h / 2 - 10) * scaleY;
+      rightInd.style.left = rx + 'px';
+      rightInd.style.top = ry + 'px';
+      rightInd.textContent = 'SPD: ' + rightSpeedPopup.speed.toFixed(1);
+    } else {
+      rightInd.classList.remove('visible');
+    }
+  }
+
+  // ---------------- Input ----------------
+  window.addEventListener('keydown', e => {
+    keys[e.key.toLowerCase()] = true;
+    if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') {
+      if (state === STATE.PLAYING) pauseGame();
+      else if (state === STATE.PAUSED) resumeGame();
+    }
+  });
+  window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+  function getTouchY(e, t) {
+    const rect = canvas.getBoundingClientRect();
+    return (t.clientY - rect.top) / rect.height * GAME_H;
+  }
+  function getTouchX(e, t) {
+    const rect = canvas.getBoundingClientRect();
+    return (t.clientX - rect.left) / rect.width * GAME_W;
+  }
+
+  canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+  canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+  canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+  canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+
+  function handleTouchStart(e) {
+    if (state !== STATE.PLAYING) return;
+    e.preventDefault();
+    initAudio();
+    for (const t of e.changedTouches) {
+      const x = getTouchX(e, t);
+      const y = getTouchY(e, t);
+      if (x < GAME_W / 2) touch.left = { id: t.identifier, y };
+      else touch.right = { id: t.identifier, y };
+    }
+  }
+  function handleTouchMove(e) {
+    if (state !== STATE.PLAYING) return;
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      if (touch.left && touch.left.id === t.identifier) touch.left.y = getTouchY(e, t);
+      if (touch.right && touch.right.id === t.identifier) touch.right.y = getTouchY(e, t);
+    }
+  }
+  function handleTouchEnd(e) {
+    if (state !== STATE.PLAYING) return;
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      if (touch.left && touch.left.id === t.identifier) touch.left = null;
+      if (touch.right && touch.right.id === t.identifier) touch.right = null;
+    }
+  }
+
+  let mouseDown = false;
+  canvas.addEventListener('mousedown', e => { 
+    if (state !== STATE.PLAYING) return;
+    mouseDown = true; 
+    initAudio(); 
+    handleMouse(e); 
+  });
+  canvas.addEventListener('mousemove', e => { 
+    if (mouseDown && state === STATE.PLAYING) handleMouse(e); 
+  });
+  canvas.addEventListener('mouseup', () => { 
+    mouseDown = false; 
+    touch.left = null; 
+    touch.right = null; 
+  });
+  function handleMouse(e) {
+    if (state !== STATE.PLAYING) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width * GAME_W;
+    const y = (e.clientY - rect.top) / rect.height * GAME_H;
+    if (x < GAME_W / 2) touch.left = { id: 'mouse', y };
+    else touch.right = { id: 'mouse', y };
+  }
+
+  // ---------------- Game Loop ----------------
+  function update(dt) {
+    if (keys['w']) left.vy = -PADDLE_SPEED;
+    else if (keys['s']) left.vy = PADDLE_SPEED;
+    else left.vy = 0;
+
+    if (touch.left) {
+      const target = touch.left.y - left.h / 2;
+      const diff = target - left.y;
+      left.vy = Math.max(-PADDLE_SPEED * 1.2, Math.min(PADDLE_SPEED * 1.2, diff * 0.25));
+    }
+    left.y += left.vy;
+    left.y = Math.max(0, Math.min(GAME_H - left.h, left.y));
+
+    if (mode === 'ai') {
+      aiControl();
+    } else {
+      if (keys['arrowup']) right.vy = -PADDLE_SPEED;
+      else if (keys['arrowdown']) right.vy = PADDLE_SPEED;
+      else right.vy = 0;
+      if (touch.right) {
+        const target = touch.right.y - right.h / 2;
+        const diff = target - right.y;
+        right.vy = Math.max(-PADDLE_SPEED * 1.2, Math.min(PADDLE_SPEED * 1.2, diff * 0.25));
+      }
+    }
+    right.y += right.vy;
+    right.y = Math.max(0, Math.min(GAME_H - right.h, right.y));
+
+    ball.x += ball.vx;
+    ball.y += ball.vy;
+
+    trail.push({ x: ball.x, y: ball.y, life: 1 });
+    if (trail.length > 14) trail.shift();
+    for (const p of trail) p.life -= 0.08;
+
+    if (ball.y - ball.r < 0) {
+      ball.y = ball.r; ball.vy *= -1;
+      spawnParticles(ball.x, ball.y, '#ffffff', 6);
+      playSound('wall');
+    }
+    if (ball.y + ball.r > GAME_H) {
+      ball.y = GAME_H - ball.r; ball.vy *= -1;
+      spawnParticles(ball.x, ball.y, '#ffffff', 6);
+      playSound('wall');
+    }
+
+    if (collides(ball, left)) {
+      ball.x = left.x + left.w + ball.r;
+      const rel = (ball.y - (left.y + left.h / 2)) / (left.h / 2);
+      const angle = rel * (Math.PI / 3.5);
+      const maxSpeed = getBallSpeed() * 2.2;
+      ball.speed = Math.min(ball.speed + 0.3, maxSpeed);
+      ball.vx = Math.cos(angle) * ball.speed;
+      ball.vy = Math.sin(angle) * ball.speed;
+      spawnParticles(ball.x, ball.y, left.color, 14);
+      playSound('paddle');
+
+      // Show speed on paddle
+      const currentSpeed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+      leftSpeedPopup = { visible: true, speed: currentSpeed, timer: 60 };
+    }
+    if (collides(ball, right)) {
+      ball.x = right.x - ball.r;
+      const rel = (ball.y - (right.y + right.h / 2)) / (right.h / 2);
+      const angle = Math.PI - rel * (Math.PI / 3.5);
+      const maxSpeed = getBallSpeed() * 2.2;
+      ball.speed = Math.min(ball.speed + 0.3, maxSpeed);
+      ball.vx = Math.cos(angle) * ball.speed;
+      ball.vy = Math.sin(angle) * ball.speed;
+      spawnParticles(ball.x, ball.y, right.color, 14);
+      playSound('paddle');
+
+      // Show speed on paddle
+      const currentSpeed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+      rightSpeedPopup = { visible: true, speed: currentSpeed, timer: 60 };
+    }
+
+    // Update speed popup timers
+    if (leftSpeedPopup.timer > 0) leftSpeedPopup.timer--;
+    if (rightSpeedPopup.timer > 0) rightSpeedPopup.timer--;
+    if (leftSpeedPopup.timer <= 0) leftSpeedPopup.visible = false;
+    if (rightSpeedPopup.timer <= 0) rightSpeedPopup.visible = false;
+
+    if (ball.x < -20) {
+      scoreRight++;
+      updateHUD();
+      spawnParticles(0, ball.y, right.color, 30);
+      playSound('score');
+      checkWin() || resetBall(1);
+    } else if (ball.x > GAME_W + 20) {
+      scoreLeft++;
+      updateHUD();
+      spawnParticles(GAME_W, ball.y, left.color, 30);
+      playSound('score');
+      checkWin() || resetBall(-1);
+    }
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx; p.y += p.vy;
+      p.vx *= 0.96; p.vy *= 0.96;
+      p.life -= 0.02;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+
+    updateSpeedHUD();
+    updatePaddleSpeedIndicators();
+  }
+
+  function collides(b, p) {
+    return b.x + b.r > p.x && b.x - b.r < p.x + p.w &&
+           b.y + b.r > p.y && b.y - b.r < p.y + p.h &&
+           ((b.vx > 0 && p === right) || (b.vx < 0 && p === left));
+  }
+
+  function spawnParticles(x, y, color, n) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const s = Math.random() * 4 + 1;
+      particles.push({
+        x, y,
+        vx: Math.cos(a) * s,
+        vy: Math.sin(a) * s,
+        life: 1,
+        color
+      });
+    }
+  }
+
+  function aiControl() {
+    const diffSettings = {
+      easy:   { speed: 4.2, error: 55, react: 0.55 },
+      medium: { speed: 6.0, error: 25, react: 0.80 },
+      hard:   { speed: 7.8, error: 8,  react: 0.97 }
+    };
+    const cfg = diffSettings[difficulty];
+
+    let targetY = GAME_H / 2;
+    if (ball.vx > 0) {
+      const dx = right.x - ball.x;
+      const t = dx / ball.vx;
+      let py = ball.y + ball.vy * t;
+      while (py < 0 || py > GAME_H) {
+        if (py < 0) py = -py;
+        if (py > GAME_H) py = 2 * GAME_H - py;
+      }
+      targetY = py + (Math.random() - 0.5) * cfg.error;
+    } else {
+      targetY = GAME_H / 2 + (Math.random() - 0.5) * 40;
+    }
+
+    const center = right.y + right.h / 2;
+    const diff = targetY - center;
+    if (Math.abs(diff) > 6) {
+      right.vy = Math.sign(diff) * Math.min(cfg.speed, Math.abs(diff) * cfg.react);
+    } else {
+      right.vy = 0;
+    }
+  }
+
+  function checkWin() {
+    if (scoreLeft >= winScore || scoreRight >= winScore) {
+      endGame();
+      return true;
+    }
+    return false;
+  }
+
+  // ---------------- Render ----------------
+  function draw() {
+    const t = getTheme();
+
+    // Background
+    ctx.fillStyle = t.bg;
+    ctx.fillRect(0, 0, GAME_W, GAME_H);
+
+    // Grid
+    ctx.strokeStyle = t.grid;
+    ctx.lineWidth = 1;
+    for (let x = 0; x < GAME_W; x += 40) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, GAME_H); ctx.stroke();
+    }
+    for (let y = 0; y < GAME_H; y += 40) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(GAME_W, y); ctx.stroke();
+    }
+
+    // Center line
+    ctx.setLineDash([10, 12]);
+    ctx.strokeStyle = t.line;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(GAME_W / 2, 0);
+    ctx.lineTo(GAME_W / 2, GAME_H);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Center circle
+    ctx.strokeStyle = t.circle;
+    ctx.beginPath();
+    ctx.arc(GAME_W / 2, GAME_H / 2, 60, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Trail
+    for (let i = 0; i < trail.length; i++) {
+      const tr = trail[i];
+      if (tr.life <= 0) continue;
+      ctx.globalAlpha = tr.life * 0.4;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(tr.x, tr.y, ball.r * tr.life, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // Paddles
+    drawPaddle(left);
+    drawPaddle(right);
+
+    // Ball
+    ctx.shadowColor = '#ffffff';
+    ctx.shadowBlur = 20;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Particles
+    for (const p of particles) {
+      ctx.globalAlpha = Math.max(0, p.life);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 2 + p.life * 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawPaddle(p) {
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = p.color;
+    roundRect(ctx, p.x, p.y, p.w, p.h, 4);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function loop(ts) {
+    const dt = Math.min(32, ts - lastTime);
+    lastTime = ts;
+    if (state === STATE.PLAYING) update(dt);
+    if (state === STATE.PLAYING || state === STATE.PAUSED) draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ---------------- UI ----------------
+  const menu = document.getElementById('menu');
+  const pauseMenu = document.getElementById('pauseMenu');
+  const gameOver = document.getElementById('gameOver');
+  const settingsMenu = document.getElementById('settingsMenu');
+  const hud = document.getElementById('hud');
+  const pauseBtn = document.getElementById('pauseBtn');
+
+  function show(el) { el.classList.remove('hidden'); }
+  function hide(el) { el.classList.add('hidden'); }
+
+  function startGame() {
+    initAudio();
+    resetGame();
+    hide(menu); hide(pauseMenu); hide(gameOver); hide(settingsMenu);
+    hud.style.display = 'flex';
+    pauseBtn.style.display = 'flex';
+    state = STATE.PLAYING;
+  }
+
+  function pauseGame() {
+    if (state !== STATE.PLAYING) return;
+    state = STATE.PAUSED;
+    show(pauseMenu);
+  }
+  function resumeGame() {
+    if (state !== STATE.PAUSED) return;
+    state = STATE.PLAYING;
+    hide(pauseMenu);
+  }
+  function endGame() {
+    state = STATE.OVER;
+    const leftWins = scoreLeft > scoreRight;
+    const winnerEl = document.getElementById('winnerText');
+    const t = getTheme();
+    if (mode === 'ai') {
+      winnerEl.textContent = leftWins ? 'YOU WIN!' : 'AI WINS!';
+    } else {
+      winnerEl.textContent = leftWins ? 'PLAYER 1 WINS' : 'PLAYER 2 WINS';
+    }
+    winnerEl.className = 'winner ' + (leftWins ? 'cyan' : 'pink');
+    winnerEl.style.color = leftWins ? t.left : t.right;
+    winnerEl.style.textShadow = `0 0 20px ${leftWins ? t.left : t.right}`;
+    document.getElementById('finalScore').textContent = `${scoreLeft} — ${scoreRight}`;
+
+    // Check best score
+    const playerScore = leftWins ? scoreLeft : scoreRight;
+    const isNewBest = saveBestScore(playerScore);
+    const bestGameOverEl = document.getElementById('bestScoreGameOver');
+    if (isNewBest) {
+      bestGameOverEl.style.display = 'flex';
+      bestGameOverEl.classList.add('new-best');
+      document.getElementById('bestScoreGameOverVal').textContent = bestScore;
+      playSound('win');
+    } else {
+      bestGameOverEl.style.display = 'none';
+      bestGameOverEl.classList.remove('new-best');
+      playSound('lose');
+    }
+
+    updateBestScoreDisplays();
+    show(gameOver);
+  }
+  function toMenu() {
+    state = STATE.MENU;
+    hide(pauseMenu); hide(gameOver); hide(settingsMenu);
+    hud.style.display = 'none';
+    pauseBtn.style.display = 'none';
+    updateBestScoreDisplays();
+    show(menu);
+  }
+
+  // Mode buttons
+  document.querySelectorAll('#modeRow .btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      initAudio();
+      document.querySelectorAll('#modeRow .btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      mode = btn.dataset.mode;
+      const diffLabel = document.getElementById('diffLabel');
+      const diffRow = document.getElementById('diffRow');
+      if (mode === 'ai') {
+        diffLabel.style.display = '';
+        diffRow.style.display = '';
+      } else {
+        diffLabel.style.display = 'none';
+        diffRow.style.display = 'none';
+      }
+    });
+  });
+  document.querySelectorAll('#diffRow .btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      initAudio();
+      document.querySelectorAll('#diffRow .btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      difficulty = btn.dataset.diff;
+    });
+  });
+  document.querySelectorAll('#winRow .btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      initAudio();
+      document.querySelectorAll('#winRow .btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      winScore = parseInt(btn.dataset.win, 10);
+    });
+  });
+
+  // Settings UI
+  const paddleSizeSlider = document.getElementById('paddleSizeSlider');
+  const ballSpeedSlider = document.getElementById('ballSpeedSlider');
+  const ballSizeSlider = document.getElementById('ballSizeSlider');
+  const paddleSizeValue = document.getElementById('paddleSizeValue');
+  const ballSpeedValue = document.getElementById('ballSpeedValue');
+  const ballSizeValue = document.getElementById('ballSizeValue');
+  const themeValue = document.getElementById('themeValue');
+
+  // Sound toggle
+  const soundToggle = document.getElementById('soundToggle');
+  const soundValueEl = document.getElementById('soundValue');
+
+  // Load saved sound setting
+  const savedSound = localStorage.getItem('neonPongSound');
+  if (savedSound !== null) {
+    soundEnabled = savedSound === 'true';
+  }
+  if (soundEnabled) {
+    soundToggle.classList.add('active');
+    soundValueEl.textContent = 'ON';
+  } else {
+    soundToggle.classList.remove('active');
+    soundValueEl.textContent = 'OFF';
+  }
+
+  soundToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    soundEnabled = !soundEnabled;
+    localStorage.setItem('neonPongSound', soundEnabled.toString());
+    if (soundEnabled) {
+      soundToggle.classList.add('active');
+      soundValueEl.textContent = 'ON';
+      initAudio();
+      playSound('paddle');
+    } else {
+      soundToggle.classList.remove('active');
+      soundValueEl.textContent = 'OFF';
+    }
+  });
+
+  function updateSettingsUI() {
+    paddleSizeSlider.value = settings.paddleSize;
+    ballSpeedSlider.value = settings.ballSpeed;
+    ballSizeSlider.value = settings.ballSize;
+    paddleSizeValue.textContent = getPaddleLabel(settings.paddleSize);
+    ballSpeedValue.textContent = getSpeedLabel(settings.ballSpeed);
+    ballSizeValue.textContent = getSizeLabel(settings.ballSize);
+    themeValue.textContent = getTheme().name;
+    buildThemeGrid();
+  }
+
+  paddleSizeSlider.addEventListener('input', () => {
+    settings.paddleSize = parseInt(paddleSizeSlider.value, 10);
+    paddleSizeValue.textContent = getPaddleLabel(settings.paddleSize);
+  });
+  ballSpeedSlider.addEventListener('input', () => {
+    settings.ballSpeed = parseInt(ballSpeedSlider.value, 10);
+    ballSpeedValue.textContent = getSpeedLabel(settings.ballSpeed);
+  });
+  ballSizeSlider.addEventListener('input', () => {
+    settings.ballSize = parseInt(ballSizeSlider.value, 10);
+    ballSizeValue.textContent = getSizeLabel(settings.ballSize);
+  });
+
+  document.getElementById('settingsBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    initAudio();
+    updateSettingsUI();
+    hide(menu);
+    show(settingsMenu);
+  });
+  document.getElementById('backSettingsBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    hide(settingsMenu);
+    show(menu);
+  });
+  document.getElementById('resetSettingsBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    settings.paddleSize = 3;
+    settings.ballSpeed = 3;
+    settings.ballSize = 3;
+    settings.theme = 'neon';
+    applyTheme();
+    updateSettingsUI();
+  });
+
+  document.getElementById('startBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    startGame();
+  });
+  document.getElementById('resumeBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    resumeGame();
+  });
+  document.getElementById('restartBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    hide(pauseMenu); 
+    startGame();
+  });
+  document.getElementById('quitBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    toMenu();
+  });
+  document.getElementById('playAgainBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    startGame();
+  });
+  document.getElementById('menuBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    toMenu();
+  });
+  pauseBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (state === STATE.PLAYING) pauseGame();
+    else if (state === STATE.PAUSED) resumeGame();
+  });
+
+  // Init
+  resize();
+  resetGame();
+  applyTheme();
+  buildThemeGrid();
+  updateBestScoreDisplays();
+  draw();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
